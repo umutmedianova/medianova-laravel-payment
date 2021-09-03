@@ -10,7 +10,7 @@ class TestCase extends OrchestraTestCase
     /**
      * Load package service provider
      * @param  \Illuminate\Foundation\Application $app
-     * @return Medianova\LaravelPayment\LaravelPaymentServiceProvider
+     * @return string[]
      */
     protected function getPackageProviders($app)
     {

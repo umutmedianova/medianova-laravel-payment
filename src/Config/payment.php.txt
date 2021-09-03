@@ -3,6 +3,7 @@
 return [
     'provider'=>env('PAYMENT_PROVIDER', 'quickbooks'),
     'vakifbank'=>[
+        'base_url' => env('PAYMENT_BASE_URL', 'https://onlineodemetest.vakifbank.com.tr:4443/VposService/v3/Vposreq.aspx'),
         'company_id' =>  env('PAYMENT_NUMBER', '000000000000000'),
         'pos_number' => env('PAYMENT_POS_NUMBER', '00000000'),
         'password' => env('PAYMENT_PASSWORD', '00000000'),
