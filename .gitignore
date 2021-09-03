@@ -179,4 +179,3 @@ fabric.properties
 /.idea
 composer.lock
 .phpunit.result.cache
-/src/Config/payment.php
