@@ -16,6 +16,6 @@ return [
         'client_secret' => env('PAYMENT_CLIENT_SECRET', 'XXXXXXXXXXXXX'),
         'redirect_url' => env('PAYMENT_REDIRECT_URI', 'https://developer.intuit.com/v2/OAuth2Playground/RedirectUrl'),
         'scope' => env('PAYMENT_OAUTH_SCOPE', 'com.intuit.quickbooks.accounting, openID, profile, phone, address'),
-        'base_url' =>  env('PAYMENT_BASE_URL', 'development'),
+        'base_url' =>  env('PAYMENT_QUICKBOOKS_BASE_URL', 'development'),
     ],
 ];

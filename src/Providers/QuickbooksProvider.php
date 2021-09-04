@@ -39,17 +39,17 @@ class QuickbooksProvider implements PaymentInterface
     {
 
         // Variables
-        $this->auth_mode = config('payment.quickbooks.auth_mode');
-        $this->client_id = config('payment.quickbooks.client_id');
-        $this->client_secret = config('payment.quickbooks.client_secret');
-        $this->access_token = config('payment.quickbooks.access_token');
-        $this->refresh_token = config('payment.quickbooks.refresh_token');
-        $this->real_me_id = config('payment.quickbooks.real_me_id');
-        $this->username = config('payment.quickbooks.username');
-        $this->password = config('payment.quickbooks.password');
-        $this->redirect_url = config('payment.quickbooks.redirect_url');
-        $this->scope = config('payment.quickbooks.scope');
-        $this->base_url = config('payment.quickbooks.base_url');
+        $this->auth_mode = config('payment.quickbooks.auth_mode') ?? null;
+        $this->client_id = config('payment.quickbooks.client_id') ?? null;
+        $this->client_secret = config('payment.quickbooks.client_secret') ?? null;
+        $this->access_token = config('payment.quickbooks.access_token') ?? null;
+        $this->refresh_token = config('payment.quickbooks.refresh_token') ?? null;
+        $this->real_me_id = config('payment.quickbooks.real_me_id') ?? null;
+        $this->username = config('payment.quickbooks.username') ?? null;
+        $this->password = config('payment.quickbooks.password') ?? null;
+        $this->redirect_url = config('payment.quickbooks.redirect_url') ?? null;
+        $this->scope = config('payment.quickbooks.scope') ?? null;
+        $this->base_url = config('payment.quickbooks.base_url') ?? null;
 
         // Options
         $options = array(
@@ -61,21 +61,15 @@ class QuickbooksProvider implements PaymentInterface
             'QBORealmID' => $this->real_me_id,
             'RedirectURI' => $this->redirect_url,
             'scope' => $this->scope,
-            'baseUrl' => "development"
+            'baseUrl' => 'development'
         );
 
-        // Update Token
-        $access_token = Cache::get('payment-api-token', null);
-        if (!empty($access_token)) {
-            $this->access_token = $access_token;
-            $this->dataService = DataService::Configure($options);
-        } else {
-            $this->dataService = DataService::Configure($options);
-            $this->access_token = $this->login();
-        }
+        $this->dataService = DataService::Configure($options);
+        $this->login = $this->login();
 
-        if ($this->access_token != null) {
-            $this->dataService->updateOAuth2Token($this->access_token);
+        if ($this->login != null) {
+            $this->dataService->updateOAuth2Token($this->login);
+            $this->access_token = $this->login->getAccessToken();
         } else {
             throw new LaravelPaymentException("Access token must not null");
         }
@@ -88,10 +82,8 @@ class QuickbooksProvider implements PaymentInterface
      */
     public function login()
     {
-        return Cache::remember('payment-api-token', 3500, function () {
-            $OAuth2LoginHelper = $this->dataService->getOAuth2LoginHelper();
-            return $OAuth2LoginHelper->refreshToken();
-        });
+        $OAuth2LoginHelper = $this->dataService->getOAuth2LoginHelper();
+        return $OAuth2LoginHelper->refreshAccessTokenWithRefreshToken($this->refresh_token);
     }
 
 
@@ -104,10 +96,10 @@ class QuickbooksProvider implements PaymentInterface
 
         $client = new PaymentClient([
             'access_token' => $this->access_token,
-            'environment' => $this->base_url
+            'environment' => 'development'
         ]);
 
-        $charge = ChargeOperations::buildFrom($data);
+        $charge = ChargeOperations::buildFrom($this->transformData($data));
         $response = $client->charge($charge);
 
         $res = [];
@@ -115,17 +107,49 @@ class QuickbooksProvider implements PaymentInterface
         if ($response->failed()) {
             $code = $response->getStatusCode();
             $errorMessage = $response->getBody();
+            $res['status'] = 'FAILED';
             $res['code'] = $code;
-            $res['errorMessage'] = $errorMessage;
+            $res['message'] = $errorMessage;
         } else {
             $responseCharge = $response->getBody();
             $id = $responseCharge->id;
             $status = $responseCharge->status;
-            $res['id'] = $id;
-            $res['status'] = $status;
+            $res['status'] = 'OK';
+            $res['data'] = ['id' => $id, 'status' => $status];
         }
 
         return $res;
+    }
+
+    /**
+     * @param $data
+     * @return array
+     */
+    function transformData($data){
+
+        $CardName = $data['CardName'] ?? null;
+        $CurrencyAmount = $data['CurrencyAmount'] ?? null;
+        $CurrencyCode = $data['CurrencyCode'] ?? null;
+        $Pan = $data['Pan'] ?? null;
+        $Expiry = $data['Expiry'] ?? null;
+        $Cvv = $data['Cvv'] ?? null;
+        $Ip = $data['$Ip'] ?? null;
+
+        return [
+            "amount" => $CurrencyAmount,
+            "currency" => $CurrencyCode,
+            "card" => [
+                "name" => $CardName,
+                "number" => $Pan,
+                "expMonth" => (($Expiry != null) ? substr($Expiry,2,2) : null),
+                "expYear" => (($Expiry != null) ? substr($Expiry,0,4) : null),
+                "cvc" => $Cvv
+            ],
+            "context" => [
+                "mobile" => "false",
+                "isEcommerce" => "true"
+            ]
+        ];
     }
 
 }
