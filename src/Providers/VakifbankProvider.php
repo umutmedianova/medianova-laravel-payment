@@ -4,6 +4,7 @@ namespace Medianova\LaravelPayment\Providers;
 
 use Medianova\LaravelPayment\Interfaces\PaymentInterface;
 use Medianova\LaravelPayment\Exceptions\LaravelPaymentException;
+use SimpleXMLElement;
 
 class VakifbankProvider implements PaymentInterface
 {
@@ -28,14 +29,14 @@ class VakifbankProvider implements PaymentInterface
         $this->pos_number = config('payment.vakifbank.pos_number');
 
         //Data
-        $TransactionType = $data['TransactionType'] || 'Sale';
-        $TransactionId = $data['TransactionId'] || 'SIP_'.time();
-        $CurrencyAmount = $data['CurrencyAmount'] || null;
-        $CurrencyCode = $data['CurrencyCode'] || '949';
-        $Pan = $data['Pan'] || null;
-        $Expiry = $data['Expiry'] || null;
-        $Cvv = $data['Cvv'] || null;
-        $ClientIp = $data['ClientIp'] || null;
+        $TransactionType = $data['TransactionType'] ?? 'Sale';
+        $TransactionId = $data['TransactionId']  ?? 'SIP_'.time();
+        $CurrencyAmount = $data['CurrencyAmount'] ?? null;
+        $CurrencyCode = $this->currencyToCurrencyCode($data['CurrencyCode'] ?? '949');
+        $Pan = $data['Pan'] ?? null;
+        $Expiry = $data['Expiry'] ?? null;
+        $Cvv = $data['Cvv'] ?? null;
+        $ClientIp = $data['ClientIp'] ?? null;
 
         $PosXML = 'prmstr=<VposRequest><MerchantId>' . $this->company_id . '</MerchantId>';
         $PosXML = $PosXML . '<Password>' . $this->password . '</Password>';
@@ -76,14 +77,71 @@ class VakifbankProvider implements PaymentInterface
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 5);
             curl_setopt($ch, CURLOPT_TIMEOUT, 59);
             curl_setopt($ch, CURLOPT_SSLVERSION, "CURL_SSLVERSION_TLSv1_1");
-            $response = curl_exec($ch);
+            $res = curl_exec($ch);
             curl_close($ch);
-            return $response;
+            return $this->response($res);
 
         } catch (\Exception $e) {
             throw new LaravelPaymentException($e->getMessage(), 1);
         }
 
+    }
+
+    /**
+     * @param $currencyCode
+     * @return string
+     */
+    function currencyCodeToCurrency($currencyCode)
+    {
+        $codeList = ['949' => 'TRY', '840' => 'USD', '978' => 'EUR', '826' => 'GBP'];
+        return $codeList[$currencyCode] ?? 'TRY';
+    }
+
+    /**
+     * @param $currency
+     * @return int|string
+     */
+    function currencyToCurrencyCode($currency)
+    {
+        $currencyList = ['TRY' => '949', 'USD' => '840', 'EUR' => '978', '826' => 'GBP'];
+        return $currencyList[$currency] ?? 949;
+    }
+
+    /**
+     * @param $res
+     * @throws \Exception
+     */
+    function response($res)
+    {
+        $xml = (array)(new SimpleXMLElement($res));
+        $MerchantId = $xml['MerchantId'] ?? null;
+        $TransactionType = $xml['TransactionType'] ?? null;
+        $TransactionId = $xml['TransactionId'] ?? null;
+        $ResultCode = $xml['ResultCode'] ?? null;
+        $ResultDetail = $xml['ResultDetail'] ?? null;
+        $CurrencyAmount = $xml['CurrencyAmount'] ?? null;
+        $CurrencyCode = $xml['CurrencyCode'] ?? null;
+        $Currency = $this->currencyCodeToCurrency($xml['CurrencyCode'] ?? null);
+
+        $res = [];
+        if($ResultCode == '0000'){
+            $res['status'] = 'OK';
+            $res['data'] = [
+                'MerchantId' => $MerchantId,
+                'TransactionType' => $TransactionType,
+                'TransactionId' => $TransactionId,
+                'ResultCode' => $ResultCode,
+                'ResultDetail' => $ResultDetail,
+                'CurrencyAmount' => $CurrencyAmount,
+                'CurrencyCode' => $CurrencyCode,
+                'Currency' => $Currency,
+            ];
+        }else{
+            $res['status'] = 'FAILED';
+            $res['message'] = $ResultDetail;
+        }
+
+        return $res;
     }
 
 }
