@@ -138,6 +138,7 @@ class VakifbankProvider implements PaymentInterface
             ];
         }else{
             $res['status'] = 'FAILED';
+            $res['code'] = $ResultCode;
             $res['message'] = $ResultDetail;
         }
 
